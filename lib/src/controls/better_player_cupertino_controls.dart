@@ -31,6 +31,7 @@ class BetterPlayerCupertinoControls extends StatefulWidget {
 class _BetterPlayerCupertinoControlsState extends BetterPlayerControlsState<BetterPlayerCupertinoControls> {
   final marginSize = 5.0;
   VideoPlayerValue? _latestValue;
+  Duration? _dragPosition;
   double? _latestVolume;
   Timer? _hideTimer;
   Timer? _expandCollapseTimer;
@@ -331,7 +332,7 @@ class _BetterPlayerCupertinoControlsState extends BetterPlayerControlsState<Bett
       );
 
   Widget _buildPosition() {
-    final position = _latestValue != null ? _latestValue!.position : Duration.zero;
+    final position = _dragPosition ?? (_latestValue != null ? _latestValue!.position : Duration.zero);
 
     return Padding(
       padding: const EdgeInsets.only(right: 12),
@@ -347,8 +348,9 @@ class _BetterPlayerCupertinoControlsState extends BetterPlayerControlsState<Bett
   }
 
   Widget _buildRemaining() {
+    final currentPosition = _dragPosition ?? (_latestValue != null ? _latestValue!.position : Duration.zero);
     final position = _latestValue != null && _latestValue!.duration != null
-        ? _latestValue!.duration! - _latestValue!.position
+        ? _latestValue!.duration! - currentPosition
         : Duration.zero;
 
     return Padding(
@@ -501,7 +503,17 @@ class _BetterPlayerCupertinoControlsState extends BetterPlayerControlsState<Bett
         onDragStart: () {
           _hideTimer?.cancel();
         },
-        onDragEnd: _startHideTimer,
+        onDragUpdate: (Duration position) {
+          setState(() {
+            _dragPosition = position;
+          });
+        },
+        onDragEnd: () {
+          setState(() {
+            _dragPosition = null;
+          });
+          _startHideTimer();
+        },
         onTapDown: cancelAndRestartTimer,
         colors: BetterPlayerProgressColors(
           playedColor: _controlsConfiguration.progressBarPlayedColor,
