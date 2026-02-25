@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:better_player_plus/src/configuration/better_player_controls_configuration.dart';
 import 'package:better_player_plus/src/controls/better_player_clickable_widget.dart';
 import 'package:better_player_plus/src/controls/better_player_controls_state.dart';
@@ -455,11 +456,21 @@ class _BetterPlayerMaterialControlsState extends BetterPlayerControlsState<Bette
       child: RichText(
         text: TextSpan(
           text: BetterPlayerUtils.formatDuration(position),
-          style: TextStyle(fontSize: 10, color: _controlsConfiguration.textColor, decoration: TextDecoration.none),
+          style: TextStyle(
+            fontSize: 10,
+            color: _controlsConfiguration.textColor,
+            decoration: TextDecoration.none,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
           children: <TextSpan>[
             TextSpan(
               text: ' / ${BetterPlayerUtils.formatDuration(duration)}',
-              style: TextStyle(fontSize: 10, color: _controlsConfiguration.textColor, decoration: TextDecoration.none),
+              style: TextStyle(
+                fontSize: 10,
+                color: _controlsConfiguration.textColor,
+                decoration: TextDecoration.none,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
             ),
           ],
         ),
