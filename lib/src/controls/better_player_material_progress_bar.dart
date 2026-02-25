@@ -93,13 +93,13 @@ class _VideoProgressBarState extends State<BetterPlayerMaterialVideoProgressBar>
           widget.onDragUpdate!.call(lastSeek!);
         }
       },
-      onHorizontalDragEnd: (DragEndDetails details) {
+      onHorizontalDragEnd: (DragEndDetails details) async {
         if (!enableProgressBarDrag) {
           return;
         }
 
         if (lastSeek != null) {
-          betterPlayerController?.seekTo(lastSeek!);
+          await betterPlayerController?.seekTo(lastSeek!);
         }
 
         if (_controllerWasPlaying) {

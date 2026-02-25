@@ -91,13 +91,13 @@ class _VideoProgressBarState extends State<BetterPlayerCupertinoVideoProgressBar
           widget.onDragUpdate!.call(lastSeek!);
         }
       },
-      onHorizontalDragEnd: (DragEndDetails details) {
+      onHorizontalDragEnd: (DragEndDetails details) async {
         if (!enableProgressBarDrag) {
           return;
         }
 
         if (lastSeek != null) {
-          betterPlayerController?.seekTo(lastSeek!);
+          await betterPlayerController?.seekTo(lastSeek!);
         }
 
         if (_controllerWasPlaying) {
