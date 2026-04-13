@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:math';
+
 import 'package:better_player_plus/better_player_plus.dart';
 import 'package:better_player_plus/src/controls/better_player_clickable_widget.dart';
 import 'package:better_player_plus/src/core/better_player_utils.dart';
@@ -436,6 +437,9 @@ abstract class BetterPlayerControlsState<T extends StatefulWidget> extends State
 
   ///Called when player controls visibility should be changed.
   void changePlayerControlsNotVisible(bool notVisible) {
+    if (!mounted) {
+      return;
+    }
     setState(() {
       if (notVisible) {
         betterPlayerController?.postEvent(BetterPlayerEvent(BetterPlayerEventType.controlsHiddenStart));

@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:ui';
+
 import 'package:better_player_plus/src/configuration/better_player_controls_configuration.dart';
 import 'package:better_player_plus/src/controls/better_player_clickable_widget.dart';
 import 'package:better_player_plus/src/controls/better_player_controls_state.dart';
@@ -9,7 +9,6 @@ import 'package:better_player_plus/src/controls/better_player_progress_colors.da
 import 'package:better_player_plus/src/core/better_player_controller.dart';
 import 'package:better_player_plus/src/core/better_player_utils.dart';
 import 'package:better_player_plus/src/video_player/video_player.dart';
-
 // Flutter imports:
 import 'package:flutter/material.dart';
 
@@ -499,6 +498,9 @@ class _BetterPlayerMaterialControlsState extends BetterPlayerControlsState<Bette
 
     if (_controlsConfiguration.showControlsOnInitialize) {
       _initTimer = Timer(const Duration(milliseconds: 200), () {
+        if (!mounted) {
+          return;
+        }
         changePlayerControlsNotVisible(false);
       });
     }
@@ -515,6 +517,9 @@ class _BetterPlayerMaterialControlsState extends BetterPlayerControlsState<Bette
     changePlayerControlsNotVisible(true);
     _betterPlayerController!.toggleFullScreen();
     _showAfterExpandCollapseTimer = Timer(_controlsConfiguration.controlsHideTime, () {
+      if (!mounted) {
+        return;
+      }
       setState(cancelAndRestartTimer);
     });
   }
@@ -549,6 +554,9 @@ class _BetterPlayerMaterialControlsState extends BetterPlayerControlsState<Bette
       return;
     }
     _hideTimer = Timer(const Duration(milliseconds: 3000), () {
+      if (!mounted) {
+        return;
+      }
       changePlayerControlsNotVisible(true);
     });
   }
