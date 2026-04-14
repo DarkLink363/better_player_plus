@@ -1,6 +1,7 @@
 // ignore_for_file: cascade_invocations, discarded_futures
 
 import 'dart:async';
+
 import 'package:better_player_plus/src/controls/better_player_progress_colors.dart';
 import 'package:better_player_plus/src/core/better_player_controller.dart';
 import 'package:better_player_plus/src/video_player/video_player.dart';
@@ -101,7 +102,7 @@ class _VideoProgressBarState extends State<BetterPlayerCupertinoVideoProgressBar
         }
 
         if (_controllerWasPlaying) {
-          betterPlayerController?.play();
+          unawaited(betterPlayerController?.play());
         }
         _setupUpdateBlockTimer();
 
