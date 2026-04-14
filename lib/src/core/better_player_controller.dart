@@ -980,7 +980,6 @@ class BetterPlayerController {
   ///[_overriddenAspectRatio] will be used.
   double? getAspectRatio() => _overriddenAspectRatio ?? betterPlayerConfiguration.aspectRatio;
 
-  // ignore: use_setters_to_change_properties
   ///Setup overridden fit.
   void setOverriddenFit(BoxFit fit) {
     _overriddenFit = fit;
@@ -1049,7 +1048,6 @@ class BetterPlayerController {
     return videoPlayerController!.disablePictureInPicture();
   }
 
-  // ignore: use_setters_to_change_properties
   ///Set GlobalKey of BetterPlayer. Used in PiP methods called from controls.
   void setBetterPlayerGlobalKey(GlobalKey betterPlayerGlobalKey) {
     _betterPlayerGlobalKey = betterPlayerGlobalKey;
@@ -1145,7 +1143,7 @@ class BetterPlayerController {
 
   ///Clear all cached data. Video player controller must be initialized to
   ///clear the cache.
-  Future<void> clearCache() async => VideoPlayerController.clearCache();
+  Future<void> clearCache() => VideoPlayerController.clearCache();
 
   ///Build headers map that will be used to setup video player controller. Apply
   ///DRM headers if available.

@@ -214,6 +214,11 @@ extension SwiftBetterPlayerPlugin {
             return
         }
 
+        if call.method == "clearCache" {
+            cacheManager.clearCache(); result(nil)
+            return
+        }
+
         guard let argsMap = call.arguments as? [String: Any], let textureId = (argsMap["textureId"] as? NSNumber)?.int64Value, let player = players[textureId] else {
             result(FlutterMethodNotImplemented)
             return
@@ -325,8 +330,6 @@ extension SwiftBetterPlayerPlugin {
                 }
             }
             result(nil)
-        case "clearCache":
-            cacheManager.clearCache(); result(nil)
         case "stopPreCache":
             let urlArg = argsMap["url"] as? String
             let cacheKey = argsMap["cacheKey"] as? String
