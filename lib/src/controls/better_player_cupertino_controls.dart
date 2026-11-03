@@ -286,10 +286,15 @@ class _BetterPlayerCupertinoControlsState extends BetterPlayerControlsState<Bett
     onTap: () {
       cancelAndRestartTimer();
 
-      if (_latestValue!.volume == 0) {
-        controller!.setVolume(_latestVolume ?? 0.5);
+      // Przed załadowaniem filmu nie ma jeszcze wartości ani kontrolera.
+      final latestValue = _latestValue;
+      if (latestValue == null || controller == null) {
+        return;
+      }
+      if (latestValue.volume == 0) {
+        controller.setVolume(_latestVolume ?? 0.5);
       } else {
-        _latestVolume = controller!.value.volume;
+        _latestVolume = controller.value.volume;
         controller.setVolume(0);
       }
     },

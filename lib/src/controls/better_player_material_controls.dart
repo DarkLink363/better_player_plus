@@ -406,11 +406,17 @@ class _BetterPlayerMaterialControlsState extends BetterPlayerControlsState<Bette
   Widget _buildMuteButton(VideoPlayerController? controller) => BetterPlayerMaterialClickableWidget(
     onTap: () {
       cancelAndRestartTimer();
-      if (_latestValue!.volume == 0) {
-        _betterPlayerController!.setVolume(_latestVolume ?? 0.5);
+      // Przed załadowaniem filmu nie ma jeszcze wartości ani kontrolera.
+      final latestValue = _latestValue;
+      final betterPlayerController = _betterPlayerController;
+      if (latestValue == null || controller == null || betterPlayerController == null) {
+        return;
+      }
+      if (latestValue.volume == 0) {
+        betterPlayerController.setVolume(_latestVolume ?? 0.5);
       } else {
-        _latestVolume = controller!.value.volume;
-        _betterPlayerController!.setVolume(0);
+        _latestVolume = controller.value.volume;
+        betterPlayerController.setVolume(0);
       }
     },
     child: AnimatedOpacity(
