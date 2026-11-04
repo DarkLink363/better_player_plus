@@ -139,7 +139,7 @@ class _BetterPlayerMaterialControlsState extends BetterPlayerControlsState<Bette
             if (_controlsConfiguration.enableRetry)
               TextButton(
                 onPressed: () {
-                  _betterPlayerController!.retryDataSource();
+                  runPlayerAction(_betterPlayerController!.retryDataSource);
                 },
                 child: Text(
                   _betterPlayerController!.translations.generalRetry,
