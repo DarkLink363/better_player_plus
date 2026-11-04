@@ -10,10 +10,10 @@ import 'package:better_player_plus/src/core/better_player_controller.dart';
 import 'package:better_player_plus/src/core/better_player_utils.dart';
 import 'package:better_player_plus/src/video_player/video_player.dart';
 // Flutter imports:
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 class BetterPlayerMaterialControls extends StatefulWidget {
-  const BetterPlayerMaterialControls({
+  const new({
     super.key,
     required this.onControlsVisibilityChanged,
     required this.controlsConfiguration,
@@ -82,14 +82,18 @@ class _BetterPlayerMaterialControlsState extends BetterPlayerControlsState<Bette
       },
       child: AbsorbPointer(
         absorbing: controlsNotVisible,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            if (_wasLoading) Center(child: _buildLoadingWidget()) else _buildHitArea(),
-            Positioned(top: 0, left: 0, right: 0, child: _buildTopBar()),
-            Positioned(bottom: 0, left: 0, right: 0, child: _buildBottomBar()),
-            _buildNextVideoWidget(),
-          ],
+        // The bars are pinned to top: 0 / bottom: 0, so in fullscreen they land
+        // flush against the physical edges of the screen without this.
+        child: fullScreenSafeArea(
+          Stack(
+            fit: StackFit.expand,
+            children: [
+              if (_wasLoading) Center(child: _buildLoadingWidget()) else _buildHitArea(),
+              Positioned(top: 0, left: 0, right: 0, child: _buildTopBar()),
+              Positioned(bottom: 0, left: 0, right: 0, child: _buildBottomBar()),
+              _buildNextVideoWidget(),
+            ],
+          ),
         ),
       ),
     );
@@ -240,8 +244,10 @@ class _BetterPlayerMaterialControlsState extends BetterPlayerControlsState<Bette
                   if (_controlsConfiguration.enablePlayPause) _buildPlayPause(_controller!) else const SizedBox(),
                   if (_betterPlayerController!.isLiveStream())
                     _buildLiveWidget()
+                  else if (_controlsConfiguration.enableProgressText)
+                    Expanded(child: _buildPosition())
                   else
-                    _controlsConfiguration.enableProgressText ? Expanded(child: _buildPosition()) : const SizedBox(),
+                    const SizedBox(),
                   const Spacer(),
                   if (_controlsConfiguration.enableMute) _buildMuteButton(_controller) else const SizedBox(),
                   if (_controlsConfiguration.enableFullscreen) _buildExpandButton() else const SizedBox(),
@@ -250,8 +256,10 @@ class _BetterPlayerMaterialControlsState extends BetterPlayerControlsState<Bette
             ),
             if (_betterPlayerController!.isLiveStream())
               const SizedBox()
+            else if (_controlsConfiguration.enableProgressBar)
+              _buildProgressBar()
             else
-              _controlsConfiguration.enableProgressBar ? _buildProgressBar() : const SizedBox(),
+              const SizedBox(),
           ],
         ),
       ),
@@ -375,23 +383,27 @@ class _BetterPlayerMaterialControlsState extends BetterPlayerControlsState<Bette
     builder: (context, snapshot) {
       final time = snapshot.data;
       if (time != null && time > 0) {
-        return BetterPlayerMaterialClickableWidget(
-          onTap: () {
-            _betterPlayerController!.playNextVideo();
-          },
-          child: Align(
-            alignment: Alignment.bottomRight,
-            child: Container(
-              margin: EdgeInsets.only(bottom: _controlsConfiguration.controlBarHeight + 20, right: 24),
-              decoration: BoxDecoration(
-                color: _controlsConfiguration.controlBarColor,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Text(
-                  '${_betterPlayerController!.translations.controlsNextVideoIn} $time...',
-                  style: const TextStyle(color: Colors.white),
+        // Only the badge is tappable: the Align fills the player, so wrapping it made any tap
+        // during the countdown skip to the next video.
+        return Align(
+          alignment: Alignment.bottomRight,
+          child: Padding(
+            padding: EdgeInsets.only(bottom: _controlsConfiguration.controlBarHeight + 20, right: 24),
+            child: BetterPlayerMaterialClickableWidget(
+              onTap: () {
+                _betterPlayerController!.playNextVideo();
+              },
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: _controlsConfiguration.controlBarColor,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Text(
+                    '${_betterPlayerController!.translations.controlsNextVideoIn} $time...',
+                    style: const TextStyle(color: Colors.white),
+                  ),
                 ),
               ),
             ),
@@ -506,6 +518,9 @@ class _BetterPlayerMaterialControlsState extends BetterPlayerControlsState<Bette
     }
 
     _controlsVisibilityStreamSubscription = _betterPlayerController!.controlsVisibilityStream.listen((state) {
+      if (controlsNotVisible == !state) {
+        return;
+      }
       changePlayerControlsNotVisible(!state);
       if (!controlsNotVisible) {
         cancelAndRestartTimer();
@@ -609,6 +624,7 @@ class _BetterPlayerMaterialControlsState extends BetterPlayerControlsState<Bette
 
   void _onPlayerHide() {
     _betterPlayerController!.toggleControlsVisibility(!controlsNotVisible);
+    _betterPlayerController!.setControlsVisibility(!controlsNotVisible);
     widget.onControlsVisibilityChanged(!controlsNotVisible);
   }
 

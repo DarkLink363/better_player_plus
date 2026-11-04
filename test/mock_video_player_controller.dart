@@ -2,13 +2,16 @@ import 'package:better_player_plus/src/video_player/video_player.dart';
 import 'package:better_player_plus/src/video_player/video_player_platform_interface.dart';
 
 class MockVideoPlayerController extends VideoPlayerController {
-  MockVideoPlayerController() : super(autoCreate: false) {
+  new() : super(autoCreate: false) {
     value = VideoPlayerValue(duration: Duration.zero);
   }
 
   bool isLoopingState = false;
   double volume = 0;
   double speed = 1;
+  int? trackWidth;
+  int? trackHeight;
+  int? trackBitrate;
 
   @override
   Future<void> play() async {
@@ -51,6 +54,13 @@ class MockVideoPlayerController extends VideoPlayerController {
   @override
   Future<void> setSpeed(double speed) async {
     this.speed = speed;
+  }
+
+  @override
+  Future<void> setTrackParameters(int? width, int? height, int? bitrate) async {
+    trackWidth = width;
+    trackHeight = height;
+    trackBitrate = bitrate;
   }
 
   @override

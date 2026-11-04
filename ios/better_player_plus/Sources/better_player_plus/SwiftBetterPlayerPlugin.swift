@@ -5,7 +5,7 @@ import AVKit
 import UIKit
 import MediaPlayer
 
-public class SwiftBetterPlayerPlugin: NSObject, FlutterPlugin, FlutterPlatformViewFactory {
+public class BetterPlayerPlugin: NSObject, FlutterPlugin, FlutterPlatformViewFactory {
     private let messenger: FlutterBinaryMessenger
     private var players: [Int64: BetterPlayer] = [:]
     private let registrar: FlutterPluginRegistrar
@@ -28,7 +28,7 @@ public class SwiftBetterPlayerPlugin: NSObject, FlutterPlugin, FlutterPlatformVi
 
     @objc public static func register(with registrar: FlutterPluginRegistrar) {
         let channel = FlutterMethodChannel(name: "better_player_channel", binaryMessenger: registrar.messenger())
-        let instance = SwiftBetterPlayerPlugin(registrar: registrar)
+        let instance = BetterPlayerPlugin(registrar: registrar)
         registrar.addMethodCallDelegate(instance, channel: channel)
         registrar.register(instance, withId: "com.jhomlala/better_player")
     }
@@ -40,6 +40,14 @@ public class SwiftBetterPlayerPlugin: NSObject, FlutterPlugin, FlutterPlatformVi
             return BetterPlayer()
         }
         return player
+    }
+
+    private static let unboundedMaxBufferMs = 6_553_600
+
+    private func applyBufferingConfiguration(_ args: [String: Any]?, to player: BetterPlayer) {
+        guard let maxBufferMs = (args?["maxBufferMs"] as? NSNumber)?.intValue,
+              maxBufferMs > 0, maxBufferMs < BetterPlayerPlugin.unboundedMaxBufferMs else { return }
+        player.preferredForwardBufferDuration = TimeInterval(maxBufferMs) / 1000
     }
 
     private func newTextureId() -> Int64 {
@@ -198,18 +206,30 @@ public class SwiftBetterPlayerPlugin: NSObject, FlutterPlugin, FlutterPlatformVi
         }
         timeObserverIdDict.removeAll()
     }
+
+    private func disposeAllPlayers() {
+        for (_, player) in players {
+            player.dispose()
+            disposeNotificationData(player)
+        }
+        players.removeAll()
+        dataSourceDict.removeAll()
+        timeObserverIdDict.removeAll()
+        artworkImageDict.removeAll()
+        setRemoteCommandsNotificationNotActive()
+    }
 }
 
-extension SwiftBetterPlayerPlugin {
+extension BetterPlayerPlugin {
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         if call.method == "init" {
-            for (_, player) in players { player.dispose() }
-            players.removeAll()
+            disposeAllPlayers()
             result(nil)
             return
         }
         if call.method == "create" {
             let player = BetterPlayer(frame: .zero)
+            applyBufferingConfiguration(call.arguments as? [String: Any], to: player)
             onPlayerSetup(player, result: result)
             return
         }
@@ -259,10 +279,14 @@ extension SwiftBetterPlayerPlugin {
             }
             result(nil)
         case "dispose":
-            player.clear()
+            // `dispose()`, not `clear()`: `clear()` leaves the
+            // AVPictureInPictureController and its layer alive, so disposing a player
+            // while PiP was open left the window floating and playing forever.
+            player.dispose()
             disposeNotificationData(player)
             setRemoteCommandsNotificationNotActive()
             players.removeValue(forKey: textureId)
+            dataSourceDict.removeValue(forKey: textureId)
             if players.isEmpty { try? AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation]) }
             result(nil)
         case "setLooping":
@@ -342,13 +366,29 @@ extension SwiftBetterPlayerPlugin {
                 }
             }
             result(nil)
+        case "setAspectRatio":
+            guard let aspectRatioValue = argsMap["ratio"] as? String else {
+                result(nil)
+                return
+            }
+            let aspectRatio: AVLayerVideoGravity = switch(aspectRatioValue) {
+            case "aspect":
+                    .resizeAspect
+            case "fill":
+                    .resizeAspectFill
+            case "stretch":
+                    .resize
+            default: .resizeAspect
+                
+            }
+            player.setAspectRatio(aspectRatio)
+            result(nil)
         default:
             result(FlutterMethodNotImplemented)
         }
     }
 
     public func detachFromEngine(for registrar: FlutterPluginRegistrar) {
-        for (_, player) in players { player.disposeSansEventChannel() }
-        players.removeAll()
+        disposeAllPlayers()
     }
 }

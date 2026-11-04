@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui';
 import 'package:better_player_plus/src/configuration/better_player_controls_configuration.dart';
 import 'package:better_player_plus/src/controls/better_player_controls_state.dart';
 import 'package:better_player_plus/src/controls/better_player_cupertino_progress_bar.dart';
@@ -8,11 +7,11 @@ import 'package:better_player_plus/src/controls/better_player_progress_colors.da
 import 'package:better_player_plus/src/core/better_player_controller.dart';
 import 'package:better_player_plus/src/core/better_player_utils.dart';
 import 'package:better_player_plus/src/video_player/video_player.dart';
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 
 class BetterPlayerCupertinoControls extends StatefulWidget {
-  const BetterPlayerCupertinoControls({
+  const new({
     required this.onControlsVisibilityChanged,
     required this.controlsConfiguration,
     super.key,
@@ -73,7 +72,6 @@ class _BetterPlayerCupertinoControlsState extends BetterPlayerControlsState<Bett
         ? _controlsConfiguration.controlBarHeight
         : _controlsConfiguration.controlBarHeight + 10;
     const buttonPadding = 10.0;
-    final isFullScreen = _betterPlayerController?.isFullScreen ?? false;
 
     _wasLoading = isLoading(_latestValue);
     final controlsColumn = Column(
@@ -105,7 +103,9 @@ class _BetterPlayerCupertinoControlsState extends BetterPlayerControlsState<Bett
       },
       child: AbsorbPointer(
         absorbing: controlsNotVisible,
-        child: isFullScreen ? SafeArea(child: controlsColumn) : controlsColumn,
+        // Was `SafeArea`, which is inert under `immersiveSticky` — see
+        // fullScreenSafeArea.
+        child: fullScreenSafeArea(controlsColumn),
       ),
     );
   }
@@ -117,7 +117,7 @@ class _BetterPlayerCupertinoControlsState extends BetterPlayerControlsState<Bett
   }
 
   void _dispose() {
-    _controller!.removeListener(_updateState);
+    _controller?.removeListener(_updateState);
     _hideTimer?.cancel();
     _expandCollapseTimer?.cancel();
     _initTimer?.cancel();
@@ -428,23 +428,27 @@ class _BetterPlayerCupertinoControlsState extends BetterPlayerControlsState<Bett
     builder: (context, snapshot) {
       final time = snapshot.data;
       if (time != null && time > 0) {
-        return InkWell(
-          onTap: () {
-            _betterPlayerController!.playNextVideo();
-          },
-          child: Align(
-            alignment: Alignment.bottomRight,
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 4, right: 8),
-              decoration: BoxDecoration(
-                color: _controlsConfiguration.controlBarColor,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Text(
-                  '${_betterPlayerController!.translations.controlsNextVideoIn} $time ...',
-                  style: const TextStyle(color: Colors.white),
+        // Only the badge is tappable: the Align fills the player, so wrapping it made any tap
+        // during the countdown skip to the next video.
+        return Align(
+          alignment: Alignment.bottomRight,
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 4, right: 8),
+            child: InkWell(
+              onTap: () {
+                _betterPlayerController!.playNextVideo();
+              },
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: _controlsConfiguration.controlBarColor,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Text(
+                    '${_betterPlayerController!.translations.controlsNextVideoIn} $time ...',
+                    style: const TextStyle(color: Colors.white),
+                  ),
                 ),
               ),
             ),
@@ -478,6 +482,9 @@ class _BetterPlayerCupertinoControlsState extends BetterPlayerControlsState<Bett
       });
     }
     _controlsVisibilityStreamSubscription = _betterPlayerController!.controlsVisibilityStream.listen((state) {
+      if (controlsNotVisible == !state) {
+        return;
+      }
       changePlayerControlsNotVisible(!state);
 
       if (!controlsNotVisible) {
@@ -578,6 +585,7 @@ class _BetterPlayerCupertinoControlsState extends BetterPlayerControlsState<Bett
 
   void _onPlayerHide() {
     _betterPlayerController!.toggleControlsVisibility(!controlsNotVisible);
+    _betterPlayerController!.setControlsVisibility(!controlsNotVisible);
     widget.onControlsVisibilityChanged(!controlsNotVisible);
   }
 

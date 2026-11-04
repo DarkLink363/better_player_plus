@@ -5,8 +5,8 @@ import 'package:better_player_plus/better_player_plus.dart';
 import 'package:better_player_plus/src/controls/better_player_clickable_widget.dart';
 import 'package:better_player_plus/src/core/better_player_utils.dart';
 import 'package:collection/collection.dart' show IterableExtension;
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 
 ///Base class for both material and cupertino controls
 abstract class BetterPlayerControlsState<T extends StatefulWidget> extends State<T> {
@@ -22,6 +22,22 @@ abstract class BetterPlayerControlsState<T extends StatefulWidget> extends State
   bool controlsNotVisible = true;
 
   void cancelAndRestartTimer();
+
+  /// Keeps fullscreen controls clear of the display cutout, the rounded corners
+  /// and the gesture strip. A no-op outside fullscreen, where the player is just
+  /// a box on a page that has already dealt with its own insets.
+  ///
+  /// Insets by `viewPadding`, not `SafeArea`. `SafeArea` reads
+  /// `MediaQuery.padding`, and fullscreen runs under `SystemUiMode.immersiveSticky`
+  /// — the system bars are hidden, so that padding collapses to zero while the
+  /// camera cutout and the gesture area are still physically in the way.
+  /// `viewPadding` keeps reporting them whether the bars are drawn or not.
+  Widget fullScreenSafeArea(Widget child) {
+    if (!(betterPlayerController?.isFullScreen ?? false)) {
+      return child;
+    }
+    return Padding(padding: MediaQuery.viewPaddingOf(context), child: child);
+  }
 
   bool isVideoFinished(VideoPlayerValue? videoPlayerValue) =>
       videoPlayerValue?.position != null &&
@@ -43,7 +59,7 @@ abstract class BetterPlayerControlsState<T extends StatefulWidget> extends State
   }
 
   void skipForward() {
-    if (latestValue != null) {
+    if (latestValue != null && latestValue!.duration != null) {
       cancelAndRestartTimer();
       final end = latestValue!.duration!.inMilliseconds;
       final skip =
@@ -55,12 +71,37 @@ abstract class BetterPlayerControlsState<T extends StatefulWidget> extends State
   }
 
   void onShowMoreClicked() {
+    // A menu holding a single row is one tap of pure friction: the viewer taps the
+    // overflow icon, then taps the only thing in it. Run that action directly.
+    //
+    // Deliberately limited to "exactly one custom item and no built-in rows":
+    // every built-in handler starts with `Navigator.of(context).pop()` to dismiss
+    // this menu, so short-circuiting one of those would pop whatever route is
+    // underneath instead. Custom items carry no such assumption. With two or more
+    // rows the behaviour is unchanged.
+    final VoidCallback? onlyAction = _onlyOverflowMenuAction();
+    if (onlyAction != null) {
+      onlyAction();
+      return;
+    }
     _showModalBottomSheet([_buildMoreOptionsList()]);
+  }
+
+  /// The lone custom action, when the overflow menu would render exactly one row.
+  VoidCallback? _onlyOverflowMenuAction() {
+    final config = betterPlayerControlsConfiguration;
+    final bool hasBuiltInRow =
+        config.enablePlaybackSpeed || config.enableSubtitles || config.enableQualities || config.enableAudioTracks;
+    if (hasBuiltInRow || config.overflowMenuCustomItems.length != 1) {
+      return null;
+    }
+    return config.overflowMenuCustomItems.single.onClicked;
   }
 
   Widget _buildMoreOptionsList() {
     final translations = betterPlayerController!.translations;
     return SingleChildScrollView(
+      // Container provides padding/decoration for the options list
       // ignore: avoid_unnecessary_containers
       child: Container(
         child: Column(

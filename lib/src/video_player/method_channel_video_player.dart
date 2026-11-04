@@ -1,3 +1,4 @@
+// Platform channel method signatures require dynamic parameter types
 // ignore_for_file: avoid_annotating_with_dynamic
 
 import 'dart:async';
@@ -110,6 +111,10 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
       _channel.invokeMethod<void>('setLooping', <String, dynamic>{'textureId': textureId, 'looping': looping});
 
   @override
+  Future<void> setAspectRatio(int? textureId, String aspectRatio) =>
+      _channel.invokeMethod<void>('setAspectRatio', <String, dynamic>{'textureId': textureId, 'ratio': aspectRatio});
+
+  @override
   Future<void> play(int? textureId) => _channel.invokeMethod<void>('play', <String, dynamic>{'textureId': textureId});
 
   @override
@@ -153,7 +158,7 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
   }
 
   @override
-  Future<void> enablePictureInPicture(int? textureId, double? top, double? left, double? width, double? height) async =>
+  Future<void> enablePictureInPicture(int? textureId, double? top, double? left, double? width, double? height) =>
       _channel.invokeMethod<void>('enablePictureInPicture', <String, dynamic>{
         'textureId': textureId,
         'top': top,
@@ -239,6 +244,7 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
               key: key,
               duration: Duration(milliseconds: map['duration'] as int),
               size: size,
+              rotationCorrection: map['rotationCorrection'] as int? ?? 0,
             );
           case 'completed':
             return VideoEvent(eventType: VideoEventType.completed, key: key);

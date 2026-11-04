@@ -5,10 +5,11 @@
 // Dart imports:
 import 'dart:async';
 import 'dart:io';
+
 import 'package:better_player_plus/src/configuration/better_player_buffering_configuration.dart';
 import 'package:better_player_plus/src/video_player/video_player_platform_interface.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:material_ui/material_ui.dart';
 
 final VideoPlayerPlatform _videoPlayerPlatform = VideoPlayerPlatform.instance
   // This will clear all open videos on the platform when a full restart is
@@ -20,7 +21,7 @@ final VideoPlayerPlatform _videoPlayerPlatform = VideoPlayerPlatform.instance
 class VideoPlayerValue {
   /// Constructs a video with the given values. Only [duration] is required. The
   /// rest will initialize with default values when unset.
-  VideoPlayerValue({
+  new({
     required this.duration,
     this.size,
     this.position = Duration.zero,
@@ -33,14 +34,16 @@ class VideoPlayerValue {
     this.speed = 1.0,
     this.errorDescription,
     this.isPip = false,
+    this.aspectRatioIOS = '',
+    this.rotationCorrection = 0,
   });
 
   /// Returns an instance with a `null` [Duration].
-  VideoPlayerValue.uninitialized() : this(duration: null);
+  new uninitialized() : this(duration: null);
 
   /// Returns an instance with a `null` [Duration] and the given
   /// [errorDescription].
-  VideoPlayerValue.erroneous(String errorDescription) : this(duration: null, errorDescription: errorDescription);
+  new erroneous(String errorDescription) : this(duration: null, errorDescription: errorDescription);
 
   /// The total duration of the video.
   ///
@@ -86,6 +89,12 @@ class VideoPlayerValue {
   ///Is in Picture in Picture Mode
   final bool isPip;
 
+  //Aspect Ratio of the video for iOS
+  final String aspectRatioIOS;
+
+  /// Clockwise rotation, in degrees, the texture needs to be displayed upright.
+  final int rotationCorrection;
+
   /// Indicates whether or not the video has been loaded and is ready to play.
   bool get initialized => duration != null;
 
@@ -121,6 +130,8 @@ class VideoPlayerValue {
     String? errorDescription,
     double? speed,
     bool? isPip,
+    String? aspectRatioIOS,
+    int? rotationCorrection,
   }) => VideoPlayerValue(
     duration: duration ?? this.duration,
     size: size ?? this.size,
@@ -134,6 +145,8 @@ class VideoPlayerValue {
     speed: speed ?? this.speed,
     errorDescription: errorDescription ?? this.errorDescription,
     isPip: isPip ?? this.isPip,
+    aspectRatioIOS: aspectRatioIOS ?? this.aspectRatioIOS,
+    rotationCorrection: rotationCorrection ?? this.rotationCorrection,
   );
 
   @override
@@ -148,6 +161,8 @@ class VideoPlayerValue {
       'isLooping: $isLooping, '
       'isBuffering: $isBuffering, '
       'volume: $volume, '
+      'aspectRatioIOS: $aspectRatioIOS, '
+      'rotationCorrection: $rotationCorrection, '
       'errorDescription: $errorDescription)';
 }
 
@@ -163,7 +178,7 @@ class VideoPlayerValue {
 /// After [dispose] all further calls are ignored.
 class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   /// Constructs a [VideoPlayerController] and creates video controller on platform side.
-  VideoPlayerController({
+  new({
     this.bufferingConfiguration = const BetterPlayerBufferingConfiguration(),
     bool autoCreate = true,
   }) : super(VideoPlayerValue(duration: null)) {
@@ -206,7 +221,11 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
       videoEventStreamController.add(event);
       switch (event.eventType) {
         case VideoEventType.initialized:
-          value = value.copyWith(duration: event.duration, size: event.size);
+          value = value.copyWith(
+            duration: event.duration,
+            size: event.size,
+            rotationCorrection: event.rotationCorrection,
+          );
           if (!_initializingCompleter.isCompleted) {
             _initializingCompleter.complete(null);
           }
@@ -371,6 +390,9 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
       return;
     }
 
+    // A pending seek belongs to the previous source. Left set, `_updatePosition` keeps reporting
+    // it until playback passes it, so a shorter next video appears stuck at (or past) its end.
+    _seekPosition = null;
     value = VideoPlayerValue(duration: null, isLooping: value.isLooping, volume: value.volume);
 
     if (!_creatingCompleter.isCompleted) {
@@ -421,11 +443,26 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     await _applyPlayPause();
   }
 
+  /// Set aspect ratio for iOS for the video.
+  Future<void> setAspectRatio(String aspectRatio) async {
+    value = value.copyWith(aspectRatioIOS: aspectRatio);
+    await _applyAspectRatio();
+  }
+
   Future<void> _applyLooping() async {
     if (!_created || _isDisposed) {
       return;
     }
     await _videoPlayerPlatform.setLooping(_textureId, value.isLooping);
+  }
+
+  Future<void> _applyAspectRatio() async {
+    if (!_created || _isDisposed) {
+      return;
+    }
+    if (Platform.isIOS) {
+      await _videoPlayerPlatform.setAspectRatio(_textureId, value.aspectRatioIOS);
+    }
   }
 
   Future<void> _applyPlayPause() async {
@@ -435,13 +472,21 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     _timer?.cancel();
     if (value.isPlaying) {
       await _videoPlayerPlatform.play(_textureId);
+      // Guard against re-entrancy: if a concurrent play() call (or a dispose)
+      // happened while awaiting, cancel any timer it may have armed and bail
+      // out if we're disposed. Without this, two overlapping play() calls each
+      // create a periodic timer and the second assignment orphans the first,
+      // leaking a timer that nothing can ever cancel.
+      if (_isDisposed) {
+        return;
+      }
+      _timer?.cancel();
       _timer = Timer.periodic(const Duration(milliseconds: 300), (Timer timer) async {
         if (_isDisposed) {
           return;
         }
         final Duration? newPosition = await position;
         final DateTime? newAbsolutePosition = await absolutePosition;
-        // ignore: invariant_booleans
         if (_isDisposed) {
           return;
         }
@@ -591,19 +636,18 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     _videoPlayerPlatform.setMixWithOthers(_textureId, mixWithOthers);
   }
 
-  static Future<void> clearCache() async => _videoPlayerPlatform.clearCache();
+  static Future<void> clearCache() => _videoPlayerPlatform.clearCache();
 
-  static Future<void> preCache(DataSource dataSource, int preCacheSize) async =>
+  static Future<void> preCache(DataSource dataSource, int preCacheSize) =>
       _videoPlayerPlatform.preCache(dataSource, preCacheSize);
 
-  static Future<void> stopPreCache(String url, String? cacheKey) async =>
-      _videoPlayerPlatform.stopPreCache(url, cacheKey);
+  static Future<void> stopPreCache(String url, String? cacheKey) => _videoPlayerPlatform.stopPreCache(url, cacheKey);
 }
 
 /// Widget that displays the video controlled by [controller].
 class VideoPlayer extends StatefulWidget {
   /// Uses the given [controller] for all video rendered in this widget.
-  const VideoPlayer(this.controller, {super.key});
+  const new(this.controller, {super.key});
 
   /// The [VideoPlayerController] responsible for the video being rendered in
   /// this widget.
@@ -614,12 +658,14 @@ class VideoPlayer extends StatefulWidget {
 }
 
 class _VideoPlayerState extends State<VideoPlayer> {
-  _VideoPlayerState() {
+  new() {
     _listener = () {
       final int? newTextureId = widget.controller!.textureId;
-      if (newTextureId != _textureId) {
+      final int newRotationCorrection = widget.controller!.value.rotationCorrection;
+      if (newTextureId != _textureId || newRotationCorrection != _rotationCorrection) {
         setState(() {
           _textureId = newTextureId;
+          _rotationCorrection = newRotationCorrection;
         });
       }
     };
@@ -627,11 +673,13 @@ class _VideoPlayerState extends State<VideoPlayer> {
 
   late VoidCallback _listener;
   int? _textureId;
+  int _rotationCorrection = 0;
 
   @override
   void initState() {
     super.initState();
     _textureId = widget.controller!.textureId;
+    _rotationCorrection = widget.controller!.value.rotationCorrection;
     // Need to listen for initialization events since the actual texture ID
     // becomes available after asynchronous initialization finishes.
     widget.controller!.addListener(_listener);
@@ -642,6 +690,7 @@ class _VideoPlayerState extends State<VideoPlayer> {
     super.didUpdateWidget(oldWidget);
     oldWidget.controller!.removeListener(_listener);
     _textureId = widget.controller!.textureId;
+    _rotationCorrection = widget.controller!.value.rotationCorrection;
     widget.controller!.addListener(_listener);
   }
 
@@ -652,7 +701,13 @@ class _VideoPlayerState extends State<VideoPlayer> {
   }
 
   @override
-  Widget build(BuildContext context) => _textureId == null ? Container() : _videoPlayerPlatform.buildView(_textureId);
+  Widget build(BuildContext context) {
+    if (_textureId == null) {
+      return Container();
+    }
+    final Widget view = _videoPlayerPlatform.buildView(_textureId);
+    return _rotationCorrection == 0 ? view : RotatedBox(quarterTurns: _rotationCorrection ~/ 90, child: view);
+  }
 }
 
 /// Used to configure the [VideoProgressIndicator] widget's colors for how it
@@ -673,7 +728,7 @@ class VideoProgressColors {
   /// [backgroundColor] defaults to gray at 50% opacity. This is the background
   /// color behind both [playedColor] and [bufferedColor] to denote the total
   /// size of the video compared to either of those values.
-  VideoProgressColors({
+  new({
     this.playedColor = const Color.fromRGBO(255, 0, 0, 0.7),
     this.bufferedColor = const Color.fromRGBO(50, 50, 200, 0.2),
     this.backgroundColor = const Color.fromRGBO(200, 200, 200, 0.5),
@@ -696,7 +751,7 @@ class VideoProgressColors {
 }
 
 class _VideoScrubber extends StatefulWidget {
-  const _VideoScrubber({required this.child, required this.controller});
+  const new({required this.child, required this.controller});
 
   final Widget child;
   final VideoPlayerController controller;
@@ -770,7 +825,7 @@ class VideoProgressIndicator extends StatefulWidget {
   /// Defaults will be used for everything except [controller] if they're not
   /// provided. [allowScrubbing] defaults to false, and [padding] will default
   /// to `top: 5.0`.
-  VideoProgressIndicator(
+  new(
     this.controller, {
     VideoProgressColors? colors,
     this.allowScrubbing,
@@ -804,7 +859,7 @@ class VideoProgressIndicator extends StatefulWidget {
 }
 
 class _VideoProgressIndicatorState extends State<VideoProgressIndicator> {
-  _VideoProgressIndicatorState() {
+  new() {
     listener = () {
       if (!mounted) {
         return;
@@ -899,7 +954,7 @@ class ClosedCaption extends StatelessWidget {
   /// [VideoPlayerValue.caption].
   ///
   /// If [text] is null, nothing will be displayed.
-  const ClosedCaption({super.key, this.text, this.textStyle});
+  const new({super.key, this.text, this.textStyle});
 
   /// The text that will be shown in the closed caption, or null if no caption
   /// should be shown.
