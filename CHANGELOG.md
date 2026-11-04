@@ -1,3 +1,111 @@
+## 2.0.1
+
+**Fixes**
+
+* Next-video countdown: only the badge is tappable now (Material and Cupertino controls). Previously the whole player area was clickable during the countdown and tapping anywhere skipped to the next video
+* `skipForward` no longer throws when the video duration is unknown
+* Pending seek position is reset when the data source changes, so a shorter next video no longer appears stuck at or past its end
+* `showPlaceholderUntilPlay`: a paused source change no longer hides the video; it is hidden only while waiting for play is requested
+
+**Changes**
+
+* Updated dependencies: `material_ui` to ^1.8.0, `cupertino_ui` to ^1.1.4, `wakelock_plus` to ^1.8.2
+* Added placeholder regression tests (`test/better_player_placeholder_test.dart`)
+
+## 2.0.0
+
+**Breaking changes**
+
+* Minimum SDK raised to Dart `>=3.13.0` and Flutter `>=3.47.0`
+* Minimum iOS deployment target raised from 13.0 to 15.0 (podspec and Swift Package)
+* Material and Cupertino widgets now come from the `material_ui` and `cupertino_ui` packages instead of `package:flutter/material.dart` / `package:flutter/cupertino.dart`
+* Codebase migrated to Dart 3.13 primary constructor syntax
+
+**Changes**
+
+* Upgraded Android Media3 dependencies to 1.11.1
+* Upgraded `wakelock_plus` to ^1.8.1 and `flutter_widget_from_html_core` to ^0.17.4
+* Example app now targets iOS 15.0
+* Fixed iOS stall check resuming a player that was paused while it was still buffering (a pause landing in the first second of playback was undone, and looping videos kept streaming off screen)
+* iOS now honours `BetterPlayerBufferingConfiguration.maxBufferMs` through `AVPlayerItem.preferredForwardBufferDuration` when a bounded value is passed; the default keeps AVFoundation's own behaviour
+
+## 1.4.1
+
+* Added support for Built-in Kotlin on Android (AGP 9.0+) while maintaining full backward compatibility with Flutter 3.41.0+ and AGP < 9 (#128)
+* Fixed iOS native player memory leak on dispose: unregister `dataSourceDict`, break FlutterEventChannel retain cycle, detach player layers, and clean up notification center (#129)
+* Fixed iOS latent KVO crash on deallocation: weakly track `observedItem` to safely unregister observers, and ensure observers are removed before `currentItem` checks in `clear()` (#129)
+* Preserved iOS background transition notification handler when playback ends or loops (#129)
+* Upgraded Android Media3 dependencies to 1.11.0
+
+## 1.4.0
+
+* Inlined and modernized `visibility_detector` to remove the unmaintained external dependency and prevent Flutter/Dart version conflicts
+* Fixed static analysis issue (`prefer_if_elements_to_conditional_expressions`) restoring full 160/160 pub points
+* Optimized Android native dependencies by removing unused `media3-datasource-cronet`, `media3-session`, and obsolete artifacts
+* Added Android R8 / Proguard consumer rules (`consumer-rules.pro`) for safe and effective release shrinking
+* Fixed Android Activity memory leak on detachment (`onDetachedFromActivity`)
+* Fixed potential event queue leak on player disposal in Android (`BetterPlayer.kt`)
+* Hardened `BetterPlayerListVideoPlayer` against race conditions during fast list scrolling/disposal
+* Optimized package archive size on pub.dev by excluding heavy example native runners and test media in `.pubignore`
+
+## 1.3.5
+
+* Fixed Android hardware decoder failure by adding software decoder fallback (thanks @ZhaosongRen)
+* Fixed Android play/pause notification state not syncing from native player changes (thanks @mmeshrif)
+* Fixed `NullPointerException` in `_BetterPlayerVideoFitWidgetState.dispose` and unassigned ClearKey `DrmSessionManager` on Android (thanks @vivek995378)
+* Fixed Simplified Chinese translations (thanks @zs)
+
+## 1.3.4
+
+* Fixed iOS build error: duplicate `BetterPlayerPlugin` interface definition caused by CocoaPods exposing ObjC header alongside Swift-generated header; excluded `BetterPlayerPlugin.h/m` from podspec source files
+* Fixed iOS Profile build configuration missing `Profile.xcconfig`, causing CocoaPods base config conflict
+* Fixed Android example `build.gradle.kts` missing `org.jetbrains.kotlin.android` plugin, causing unresolved `kotlin { compilerOptions }` block
+
+## 1.3.3
+
+* Fixed iOS podspec version mismatch (was stuck at `1.3.0`), now synced with `pubspec.yaml`
+* Fixed initial track setup not awaiting `setTrack`, which could race with data source setup
+
+## 1.3.2
+
+* Fixed iOS HLS playback with `useCache: true` for modern fMP4/CMAF streams (`#EXT-X-MAP`, `.m4s`, external audio renditions) by playing HLS directly through `AVURLAsset` instead of the localhost reverse proxy
+* Fixed iOS Swift compile errors: aligned `Cache` dependency to 6.x for both CocoaPods and SPM (Cache 7.x is not published on CocoaPods) and restored the `AVURLAssetHTTPHeaderFieldsKey` string literal
+* Fixed player layout not refreshing after manual HLS/DASH quality track switch: `setTrack` now updates the reported video size and emits a `changedTrack` controller event
+* Fixed duplicate `@interface BetterPlayerPlugin` definition in the iOS plugin header
+* Hardened iOS HLS header conversion with typed `String`/`NSNumber` handling
+* Removed unused `HLSCachingReverseProxyServer`, `GCDWebServer` and `PINCache` dependencies from the iOS podspec
+* Optimized iOS BoxFit handling with scheduled application
+* `CacheManager.setup()` is now a deprecated no-op on iOS (no HLS proxy setup needed)
+
+## 1.3.1
+
+* Updated iOS dependencies and cleaned up stale SPM `Package.resolved` pins
+* Minor cleanup in `better_player_with_controls.dart`
+
+## 1.3.0
+
+* Added iOS Swift Package Manager (SPM) support
+* Added `Package.swift` to support native SPM integration
+* Migrated iOS plugin source files from `Classes/` to `better_player_plus/Sources/better_player_plus/` for SPM compatibility
+* Cleaned up legacy CocoaPods integration from the iOS example project for smoother SPM-based builds
+
+## 1.2.1
+
+* Fixed MissingPluginException for `setAspectRatio` on Android by guarding the call with `Platform.isIOS`
+
+## 1.2.0
+
+* Dart SDK updated → 3.11.0, Flutter SDK updated → 3.41.0
+* Android Media3 updated → 1.10.0
+* Fixed controlsVisibilityStream feedback loop by guarding against duplicate state updates
+* Fixed controlsVisibilityStream not emitting when UI auto-hides
+* Fixed aspect ratio issues for iOS AVPlayer
+* Fixed audio track override not being cleared before applying a new one
+* Preserved iOS playback speed across player actions (seek, pause, resume)
+* Fixed HLS parsing for default audio source selection in HLS streams
+* Added iOS wakelock (disable auto-sleep) support during playback
+* Resolved all dart analyze warnings and errors (zero issues)
+
 ## 1.1.5
 
 * Fixed error in WebVTT file parser for subtitle handling

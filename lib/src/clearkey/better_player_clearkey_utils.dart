@@ -1,3 +1,4 @@
+// JsonEncode keyMap uses dynamic for nested list/map mutations
 // ignore_for_file: avoid_dynamic_calls
 
 import 'dart:convert';
@@ -6,7 +7,7 @@ import 'dart:typed_data';
 
 ///ClearKey helper class to generate the key
 class BetterPlayerClearKeyUtils {
-  const BetterPlayerClearKeyUtils._();
+  const new _();
 
   static final _byteMask = BigInt.from(0xff);
 

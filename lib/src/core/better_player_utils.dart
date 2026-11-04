@@ -1,9 +1,9 @@
 // Flutter imports:
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 final class BetterPlayerUtils {
-  const BetterPlayerUtils._();
+  const new _();
 
   static String formatBitrate(int bitrate) {
     if (bitrate < 1000) {
@@ -59,6 +59,7 @@ final class BetterPlayerUtils {
 
   static void log(String logMessage) {
     if (!kReleaseMode) {
+      // dart:developer log is not always captured in release; print is intentional here
       // ignore: avoid_print
       print(logMessage);
     }

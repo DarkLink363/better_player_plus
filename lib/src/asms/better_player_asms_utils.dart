@@ -7,7 +7,7 @@ import 'package:better_player_plus/src/hls/better_player_hls_utils.dart';
 
 ///Base helper class for ASMS parsing.
 class BetterPlayerAsmsUtils {
-  const BetterPlayerAsmsUtils._();
+  const new _();
 
   static const String _hlsExtension = 'm3u8';
   static const String _dashExtension = 'mpd';
@@ -24,7 +24,7 @@ class BetterPlayerAsmsUtils {
   static bool isDataSourceDash(String url) => url.contains(_dashExtension);
 
   ///Parse playlist based on type of stream.
-  static Future<BetterPlayerAsmsDataHolder> parse(String data, String masterPlaylistUrl) async =>
+  static Future<BetterPlayerAsmsDataHolder> parse(String data, String masterPlaylistUrl) =>
       BetterPlayerHlsUtils.parse(data, masterPlaylistUrl);
 
   ///Request data from given uri along with headers. May return null if resource

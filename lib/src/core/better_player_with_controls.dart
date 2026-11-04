@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
+
 import 'package:better_player_plus/better_player_plus.dart';
 import 'package:better_player_plus/src/configuration/better_player_controller_event.dart';
 import 'package:better_player_plus/src/controls/better_player_cupertino_controls.dart';
@@ -8,10 +9,10 @@ import 'package:better_player_plus/src/controls/better_player_material_controls.
 import 'package:better_player_plus/src/core/better_player_utils.dart';
 import 'package:better_player_plus/src/subtitles/better_player_subtitles_drawer.dart';
 import 'package:better_player_plus/src/video_player/video_player.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 class BetterPlayerWithControls extends StatefulWidget {
-  const BetterPlayerWithControls({super.key, this.controller});
+  const new({super.key, this.controller});
 
   final BetterPlayerController? controller;
 
@@ -34,7 +35,7 @@ class _BetterPlayerWithControlsState extends State<BetterPlayerWithControls> {
   @override
   void initState() {
     playerVisibilityStreamController.add(true);
-    _controllerEventSubscription = widget.controller!.controllerEventStream.listen(_onControllerChanged);
+    _controllerEventSubscription = widget.controller?.controllerEventStream.listen(_onControllerChanged);
     super.initState();
   }
 
@@ -42,7 +43,7 @@ class _BetterPlayerWithControlsState extends State<BetterPlayerWithControls> {
   void didUpdateWidget(BetterPlayerWithControls oldWidget) {
     if (oldWidget.controller != widget.controller) {
       _controllerEventSubscription?.cancel();
-      _controllerEventSubscription = widget.controller!.controllerEventStream.listen(_onControllerChanged);
+      _controllerEventSubscription = widget.controller?.controllerEventStream.listen(_onControllerChanged);
     }
     super.didUpdateWidget(oldWidget);
   }
@@ -111,6 +112,7 @@ class _BetterPlayerWithControlsState extends State<BetterPlayerWithControls> {
     _initialized = true;
 
     final bool placeholderOnTop = betterPlayerController.betterPlayerConfiguration.placeholderOnTop;
+    // Container needed to provide constraints to the Stack inside
     // ignore: avoid_unnecessary_containers
     return Container(
       child: Stack(
@@ -136,7 +138,7 @@ class _BetterPlayerWithControlsState extends State<BetterPlayerWithControls> {
   }
 
   Widget _buildPlaceholder(BetterPlayerController betterPlayerController) =>
-      betterPlayerController.betterPlayerDataSource!.placeholder ??
+      betterPlayerController.betterPlayerDataSource?.placeholder ??
       betterPlayerController.betterPlayerConfiguration.placeholder ??
       Container();
 
@@ -184,7 +186,7 @@ class _BetterPlayerWithControlsState extends State<BetterPlayerWithControls> {
 
 ///Widget used to set the proper box fit of the video. Default fit is 'fill'.
 class _BetterPlayerVideoFitWidget extends StatefulWidget {
-  const _BetterPlayerVideoFitWidget(this.betterPlayerController, this.boxFit);
+  const new(this.betterPlayerController, this.boxFit);
 
   final BetterPlayerController betterPlayerController;
   final BoxFit boxFit;
@@ -201,6 +203,9 @@ class _BetterPlayerVideoFitWidgetState extends State<_BetterPlayerVideoFitWidget
   VoidCallback? _initializedListener;
 
   bool _started = false;
+
+  String? _lastAppliedGravity;
+  String? _pendingGravity;
 
   StreamSubscription<BetterPlayerControllerEvent>? _controllerEventSubscription;
 
@@ -221,7 +226,7 @@ class _BetterPlayerVideoFitWidgetState extends State<_BetterPlayerVideoFitWidget
     super.didUpdateWidget(oldWidget);
     if (oldWidget.betterPlayerController.videoPlayerController != controller) {
       if (_initializedListener != null) {
-        oldWidget.betterPlayerController.videoPlayerController!.removeListener(_initializedListener!);
+        oldWidget.betterPlayerController.videoPlayerController?.removeListener(_initializedListener!);
       }
       _initialized = false;
       _initialize();
@@ -235,12 +240,12 @@ class _BetterPlayerVideoFitWidgetState extends State<_BetterPlayerVideoFitWidget
           return;
         }
 
-        if (_initialized != controller!.value.initialized) {
-          _initialized = controller!.value.initialized;
+        if (_initialized != controller?.value.initialized) {
+          _initialized = controller?.value.initialized ?? false;
           setState(() {});
         }
       };
-      controller!.addListener(_initializedListener!);
+      controller?.addListener(_initializedListener!);
     } else {
       _initialized = true;
     }
@@ -253,11 +258,59 @@ class _BetterPlayerVideoFitWidgetState extends State<_BetterPlayerVideoFitWidget
           });
         }
       }
+
       if (event == BetterPlayerControllerEvent.setupDataSource) {
         setState(() {
-          _started = false;
+          // A paused source change only hides the video when waiting for play is requested.
+          _started = !widget.betterPlayerController.betterPlayerConfiguration.showPlaceholderUntilPlay;
         });
       }
+
+      if (event == BetterPlayerControllerEvent.setFit) {
+        if (Platform.isIOS) {
+          _applyBoxFitOnIOS(widget.betterPlayerController.getFit());
+        }
+      }
+    });
+  }
+
+  /// Converts [BoxFit] to a native iOS AVLayerVideoGravity string and applies it.
+  String _gravityForBoxFit(BoxFit boxFit) {
+    switch (boxFit) {
+      case BoxFit.fill:
+        return 'stretch';
+      case BoxFit.cover:
+        return 'fill';
+      case BoxFit.contain:
+      case BoxFit.fitWidth:
+      case BoxFit.fitHeight:
+      case BoxFit.scaleDown:
+      case BoxFit.none:
+        return 'aspect';
+    }
+  }
+
+  void _applyBoxFitOnIOS(BoxFit boxFit) {
+    final String gravity = _gravityForBoxFit(boxFit);
+    if (_lastAppliedGravity != gravity) {
+      _lastAppliedGravity = gravity;
+      controller?.setAspectRatio(gravity);
+    }
+  }
+
+  void _scheduleBoxFitApplyOnIOS(BoxFit boxFit) {
+    final String gravity = _gravityForBoxFit(boxFit);
+    if (_lastAppliedGravity == gravity || _pendingGravity == gravity) {
+      return;
+    }
+    _pendingGravity = gravity;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !Platform.isIOS) {
+        _pendingGravity = null;
+        return;
+      }
+      _pendingGravity = null;
+      _applyBoxFitOnIOS(widget.boxFit);
     });
   }
 
@@ -265,8 +318,9 @@ class _BetterPlayerVideoFitWidgetState extends State<_BetterPlayerVideoFitWidget
   Widget build(BuildContext context) {
     if (_initialized && _started) {
       // iOS platform views (UiKitView) don't play well with Clip/Transform/FittedBox.
-      // Render the platform view directly to avoid black screen.
+      // Apply BoxFit as native video gravity on iOS instead.
       if (Platform.isIOS) {
+        _scheduleBoxFitApplyOnIOS(widget.boxFit);
         return SizedBox.expand(child: VideoPlayer(controller));
       }
       return Center(
@@ -275,8 +329,8 @@ class _BetterPlayerVideoFitWidgetState extends State<_BetterPlayerVideoFitWidget
             child: FittedBox(
               fit: widget.boxFit,
               child: SizedBox(
-                width: max(1, controller!.value.size?.width ?? 1.0),
-                height: max(1, controller!.value.size?.height ?? 1.0),
+                width: max(1, controller?.value.size?.width ?? 1.0),
+                height: max(1, controller?.value.size?.height ?? 1.0),
                 child: VideoPlayer(controller),
               ),
             ),
@@ -291,7 +345,7 @@ class _BetterPlayerVideoFitWidgetState extends State<_BetterPlayerVideoFitWidget
   @override
   void dispose() {
     if (_initializedListener != null) {
-      widget.betterPlayerController.videoPlayerController!.removeListener(_initializedListener!);
+      widget.betterPlayerController.videoPlayerController?.removeListener(_initializedListener!);
     }
     _controllerEventSubscription?.cancel();
     super.dispose();

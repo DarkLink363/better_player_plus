@@ -1,17 +1,20 @@
 import 'dart:async';
+
 import 'package:better_player_plus/better_player_plus.dart';
 import 'package:better_player_plus/src/subtitles/better_player_subtitle.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
+import 'package:material_ui/material_ui.dart';
 
 class BetterPlayerSubtitlesDrawer extends StatefulWidget {
-  const BetterPlayerSubtitlesDrawer({
+  const new({
     super.key,
     required this.subtitles,
     required this.betterPlayerController,
     this.betterPlayerSubtitlesConfiguration,
     required this.playerVisibilityStream,
   });
+
   final List<BetterPlayerSubtitle> subtitles;
   final BetterPlayerController betterPlayerController;
   final BetterPlayerSubtitlesConfiguration? betterPlayerSubtitlesConfiguration;
@@ -23,6 +26,7 @@ class BetterPlayerSubtitlesDrawer extends StatefulWidget {
 
 class _BetterPlayerSubtitlesDrawerState extends State<BetterPlayerSubtitlesDrawer> {
   final RegExp htmlRegExp =
+      // Raw string kept for clarity even though no special sequences are present
       // ignore: unnecessary_raw_strings
       RegExp(r'<[^>]*>', multiLine: true);
   late TextStyle _innerTextStyle;
@@ -38,8 +42,12 @@ class _BetterPlayerSubtitlesDrawerState extends State<BetterPlayerSubtitlesDrawe
   @override
   void initState() {
     _visibilityStreamSubscription = widget.playerVisibilityStream.listen((state) {
-      setState(() {
-        _playerVisible = state;
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            _playerVisible = state;
+          });
+        }
       });
     });
 
@@ -49,7 +57,7 @@ class _BetterPlayerSubtitlesDrawerState extends State<BetterPlayerSubtitlesDrawe
       _configuration = setupDefaultConfiguration();
     }
 
-    widget.betterPlayerController.videoPlayerController!.addListener(_updateState);
+    widget.betterPlayerController.videoPlayerController?.addListener(_updateState);
 
     _outerTextStyle = TextStyle(
       fontSize: _configuration!.fontSize,
@@ -71,7 +79,7 @@ class _BetterPlayerSubtitlesDrawerState extends State<BetterPlayerSubtitlesDrawe
 
   @override
   void dispose() {
-    widget.betterPlayerController.videoPlayerController!.removeListener(_updateState);
+    widget.betterPlayerController.videoPlayerController?.removeListener(_updateState);
     _visibilityStreamSubscription.cancel();
     super.dispose();
   }
@@ -79,8 +87,12 @@ class _BetterPlayerSubtitlesDrawerState extends State<BetterPlayerSubtitlesDrawe
   ///Called when player state has changed, i.e. new player position, etc.
   void _updateState() {
     if (mounted) {
-      setState(() {
-        _latestValue = widget.betterPlayerController.videoPlayerController!.value;
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            _latestValue = widget.betterPlayerController.videoPlayerController!.value;
+          });
+        }
       });
     }
   }

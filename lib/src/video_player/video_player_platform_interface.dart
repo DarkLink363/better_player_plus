@@ -39,7 +39,6 @@ abstract class VideoPlayerPlatform {
   /// Defaults to [MethodChannelVideoPlayer].
   static VideoPlayerPlatform get instance => _instance;
 
-  // TODO(amirh): Extract common platform interface logic.
   // https://github.com/flutter/flutter/issues/43368
   static set instance(VideoPlayerPlatform instance) {
     if (!instance.isMock) {
@@ -113,6 +112,10 @@ abstract class VideoPlayerPlatform {
   /// Sets the video speed to a range between 0.0 and 2.0
   Future<void> setSpeed(int? textureId, double speed) {
     throw UnimplementedError('setSpeed() has not been implemented.');
+  }
+
+  Future<void> setAspectRatio(int? textureId, String aspectRatio) {
+    throw UnimplementedError('setAspectRatio() has not been implemented.');
   }
 
   /// Sets the video track parameters (used to select quality of the video)
@@ -192,7 +195,7 @@ class DataSource {
   /// The [package] argument must be non-null when the asset comes from a
   /// package and null otherwise.
   ///
-  DataSource({
+  new({
     required this.sourceType,
     this.uri,
     this.formatHint,
@@ -366,13 +369,14 @@ class VideoEvent {
   ///
   /// Depending on the [eventType], the [duration], [size] and [buffered]
   /// arguments can be null.
-  const VideoEvent({
+  const new({
     required this.eventType,
     required this.key,
     this.duration,
     this.size,
     this.buffered,
     this.position,
+    this.rotationCorrection = 0,
   });
 
   /// The type of the event.
@@ -401,6 +405,11 @@ class VideoEvent {
   ///Seek position
   final Duration? position;
 
+  /// Clockwise rotation, in degrees, the texture needs to be displayed upright.
+  ///
+  /// Only used if [eventType] is [VideoEventType.initialized].
+  final int rotationCorrection;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -410,10 +419,12 @@ class VideoEvent {
           eventType == other.eventType &&
           duration == other.duration &&
           size == other.size &&
+          rotationCorrection == other.rotationCorrection &&
           listEquals(buffered, other.buffered);
 
   @override
-  int get hashCode => eventType.hashCode ^ duration.hashCode ^ size.hashCode ^ buffered.hashCode;
+  int get hashCode =>
+      eventType.hashCode ^ duration.hashCode ^ size.hashCode ^ rotationCorrection.hashCode ^ buffered.hashCode;
 }
 
 /// Type of the event.
@@ -461,7 +472,7 @@ enum VideoEventType {
 class DurationRange {
   /// Trusts that the given [start] and [end] are actually in order. They should
   /// both be non-null.
-  const DurationRange(this.start, this.end);
+  const new(this.start, this.end);
 
   /// The beginning of the segment described relative to the beginning of the
   /// entire video. Should be shorter than or equal to [end].

@@ -1,10 +1,10 @@
 import 'package:better_player_plus/better_player_plus.dart';
 import 'package:better_player_plus/src/core/better_player_utils.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 ///Special version of Better Player which is used to play video in list view.
 class BetterPlayerListVideoPlayer extends StatefulWidget {
-  const BetterPlayerListVideoPlayer(
+  const new(
     this.dataSource, {
     this.configuration = const BetterPlayerConfiguration(),
     this.playFraction = 0.6,
@@ -44,6 +44,7 @@ class _BetterPlayerListVideoPlayerState extends State<BetterPlayerListVideoPlaye
     with AutomaticKeepAliveClientMixin<BetterPlayerListVideoPlayer> {
   BetterPlayerController? _betterPlayerController;
   bool _isDisposing = false;
+  bool _isVisible = false;
 
   @override
   void initState() {
@@ -53,6 +54,7 @@ class _BetterPlayerListVideoPlayerState extends State<BetterPlayerListVideoPlaye
       betterPlayerDataSource: widget.dataSource,
       betterPlayerPlaylistConfiguration: const BetterPlayerPlaylistConfiguration(),
     );
+    _betterPlayerController!.addEventsListener(_onPlayerEvent);
 
     if (widget.betterPlayerListVideoPlayerController != null) {
       widget.betterPlayerListVideoPlayerController!.setBetterPlayerController(_betterPlayerController);
@@ -61,14 +63,25 @@ class _BetterPlayerListVideoPlayerState extends State<BetterPlayerListVideoPlaye
 
   @override
   void dispose() {
-    _betterPlayerController!.dispose();
+    _betterPlayerController?.removeEventsListener(_onPlayerEvent);
+    _betterPlayerController?.dispose();
     _isDisposing = true;
     super.dispose();
+  }
+
+  void _onPlayerEvent(BetterPlayerEvent event) {
+    if (event.betterPlayerEventType == BetterPlayerEventType.initialized &&
+        _isVisible &&
+        widget.autoPlay &&
+        !_isDisposing) {
+      _betterPlayerController!.play();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    
     return AspectRatio(
       aspectRatio: _betterPlayerController!.getAspectRatio() ?? BetterPlayerUtils.calculateAspectRatio(context),
       child: BetterPlayer(key: Key('${_getUniqueKey()}_player'), controller: _betterPlayerController!),
@@ -76,15 +89,19 @@ class _BetterPlayerListVideoPlayerState extends State<BetterPlayerListVideoPlaye
   }
 
   Future<void> onVisibilityChanged(double visibleFraction) async {
-    final bool? isPlaying = _betterPlayerController!.isPlaying();
-    final bool? initialized = _betterPlayerController!.isVideoInitialized();
-    if (visibleFraction >= widget.playFraction) {
-      if (widget.autoPlay && initialized! && !isPlaying! && !_isDisposing) {
-        await _betterPlayerController!.play();
+    if (_isDisposing || _betterPlayerController == null) {
+      return;
+    }
+    _isVisible = visibleFraction >= widget.playFraction;
+    final bool isPlaying = _betterPlayerController?.isPlaying() ?? false;
+    final bool initialized = _betterPlayerController?.isVideoInitialized() ?? false;
+    if (_isVisible) {
+      if (widget.autoPlay && initialized && !isPlaying && !_isDisposing) {
+        await _betterPlayerController?.play();
       }
     } else {
-      if (widget.autoPause && initialized! && isPlaying! && !_isDisposing) {
-        await _betterPlayerController!.pause();
+      if (widget.autoPause && initialized && isPlaying && !_isDisposing) {
+        await _betterPlayerController?.pause();
       }
     }
   }

@@ -83,11 +83,17 @@ class BetterPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
         activity = binding.activity
     }
 
-    override fun onDetachedFromActivityForConfigChanges() {}
+    override fun onDetachedFromActivityForConfigChanges() {
+        activity = null
+    }
 
-    override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {}
+    override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
+        activity = binding.activity
+    }
 
-    override fun onDetachedFromActivity() {}
+    override fun onDetachedFromActivity() {
+        activity = null
+    }
 
     @UnstableApi
     private fun disposeAllPlayers() {
@@ -96,6 +102,7 @@ class BetterPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
         }
         videoPlayers.clear()
         dataSources.clear()
+        stopForegroundService()
     }
 
     @UnstableApi
@@ -107,7 +114,7 @@ class BetterPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
         when (call.method) {
             INIT_METHOD -> disposeAllPlayers()
             CREATE_METHOD -> {
-                val handle = flutterState!!.textureRegistry!!.createSurfaceTexture()
+                val handle = flutterState!!.textureRegistry!!.createSurfaceProducer()
                 val eventChannel = EventChannel(
                     flutterState?.binaryMessenger, EVENTS_CHANNEL + handle.id()
                 )
@@ -246,6 +253,11 @@ class BetterPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
                 if (mixWitOthers != null) {
                     player.setMixWithOthers(mixWitOthers)
                 }
+                result.success(null)
+            }
+
+            SET_ASPECT_RATIO_METHOD -> {
+                result.success(null)
             }
 
             DISPOSE_METHOD -> {
@@ -484,6 +496,9 @@ class BetterPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
         videoPlayers.remove(textureId)
         dataSources.remove(textureId)
         stopPipHandler()
+        if (videoPlayers.size == 0) {
+            stopForegroundService()
+        }
     }
 
     private fun stopPipHandler() {
@@ -492,6 +507,12 @@ class BetterPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
             pipHandler = null
         }
         pipRunnable = null
+    }
+
+    private fun stopForegroundService() {
+        flutterState?.applicationContext?.let { context ->
+            BetterPlayerForegroundService.stop(context)
+        }
     }
 
     private interface KeyForAssetFn {
@@ -582,6 +603,7 @@ class BetterPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
         private const val DISABLE_PICTURE_IN_PICTURE_METHOD = "disablePictureInPicture"
         private const val IS_PICTURE_IN_PICTURE_SUPPORTED_METHOD = "isPictureInPictureSupported"
         private const val SET_MIX_WITH_OTHERS_METHOD = "setMixWithOthers"
+        private const val SET_ASPECT_RATIO_METHOD = "setAspectRatio"
         private const val CLEAR_CACHE_METHOD = "clearCache"
         private const val DISPOSE_METHOD = "dispose"
         private const val PRE_CACHE_METHOD = "preCache"

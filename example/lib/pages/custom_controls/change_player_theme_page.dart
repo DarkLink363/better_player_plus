@@ -1,7 +1,7 @@
 import 'package:better_player_example/constants.dart';
 import 'package:better_player_example/pages/custom_controls/custom_controls_widget.dart';
 import 'package:better_player_plus/better_player_plus.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 class ChangePlayerThemePage extends StatefulWidget {
   const ChangePlayerThemePage({super.key});
@@ -85,14 +85,11 @@ class _ChangePlayerThemePageState extends State<ChangePlayerThemePage> {
                       BetterPlayerConfiguration(
                         controlsConfiguration: BetterPlayerControlsConfiguration(
                           playerTheme: _playerTheme,
-                          customControlsBuilder: (
-                            controller,
-                            onControlsVisibilityChanged,
-                            controlsConfiguration,
-                          ) => CustomControlsWidget(
-                            controller: controller,
-                            onControlsVisibilityChanged: onControlsVisibilityChanged,
-                          ),
+                          customControlsBuilder: (controller, onControlsVisibilityChanged, controlsConfiguration) =>
+                              CustomControlsWidget(
+                                controller: controller,
+                                onControlsVisibilityChanged: onControlsVisibilityChanged,
+                              ),
                         ),
                       ),
                       betterPlayerDataSource: _dataSource,

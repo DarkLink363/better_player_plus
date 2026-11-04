@@ -4,8 +4,8 @@ publish_to: "none"
 description: "Better Player example usage app."
 
 environment:
-  sdk: ">=3.9.0 <4.0.0"
-  flutter: ">=3.35.0"
+  sdk: ">=3.11.0 <4.0.0"
+  flutter: ">=3.41.0"
 
 dependencies:
   better_player_plus:
@@ -14,9 +14,9 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
+  material_ui: ^1.6.0
   collection: ^1.19.1
-  path_provider: ^2.1.5
-  visibility_detector: ^0.4.0+2
+  path_provider: ^2.1.6
 
 dev_dependencies:
   flutter_test:
