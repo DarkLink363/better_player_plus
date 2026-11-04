@@ -286,7 +286,7 @@ class _BetterPlayerCupertinoControlsState extends BetterPlayerControlsState<Bett
     onTap: () {
       cancelAndRestartTimer();
 
-      // Przed załadowaniem filmu nie ma jeszcze wartości ani kontrolera.
+      // The controls may not have a video value or controller yet (e.g. before the video loads).
       final latestValue = _latestValue;
       if (latestValue == null || controller == null) {
         return;
@@ -501,7 +501,11 @@ class _BetterPlayerCupertinoControlsState extends BetterPlayerControlsState<Bett
   void _onExpandCollapse() {
     changePlayerControlsNotVisible(true);
     _betterPlayerController!.toggleFullScreen();
+    _expandCollapseTimer?.cancel();
     _expandCollapseTimer = Timer(_controlsConfiguration.controlsHideTime, () {
+      if (!mounted) {
+        return;
+      }
       setState(cancelAndRestartTimer);
     });
   }

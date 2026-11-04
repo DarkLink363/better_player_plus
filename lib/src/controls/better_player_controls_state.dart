@@ -10,11 +10,12 @@ import 'package:material_ui/material_ui.dart';
 
 ///Base class for both material and cupertino controls
 abstract class BetterPlayerControlsState<T extends StatefulWidget> extends State<T> {
-  /// Uruchamia akcję odtwarzacza z kontrolek bez czekania na wynik.
+  /// Runs a player action started from the controls without waiting for its result.
   ///
-  /// Błąd źródła (np. ponowna próba bez sieci) ustawia już błąd w odtwarzaczu,
-  /// więc kontrolki pokażą widok błędu. Bez złapania leciał dodatkowo jako
-  /// niezłapany wyjątek do globalnego handlera aplikacji.
+  /// A failing source (e.g. a retry without network) already puts the player into the error state, so the
+  /// controls show the error widget. Without catching it here, the error would also reach the app as an
+  /// uncaught async exception.
+  @protected
   void runPlayerAction(Future<void> Function() action) {
     action().catchError((Object error) {
       BetterPlayerUtils.log('Player action failed: $error');
