@@ -418,7 +418,7 @@ class _BetterPlayerMaterialControlsState extends BetterPlayerControlsState<Bette
   Widget _buildMuteButton(VideoPlayerController? controller) => BetterPlayerMaterialClickableWidget(
     onTap: () {
       cancelAndRestartTimer();
-      // Przed załadowaniem filmu nie ma jeszcze wartości ani kontrolera.
+      // The controls may not have a video value or controller yet (e.g. before the video loads).
       final latestValue = _latestValue;
       final betterPlayerController = _betterPlayerController;
       if (latestValue == null || controller == null || betterPlayerController == null) {
@@ -537,6 +537,7 @@ class _BetterPlayerMaterialControlsState extends BetterPlayerControlsState<Bette
   void _onExpandCollapse() {
     changePlayerControlsNotVisible(true);
     _betterPlayerController!.toggleFullScreen();
+    _showAfterExpandCollapseTimer?.cancel();
     _showAfterExpandCollapseTimer = Timer(_controlsConfiguration.controlsHideTime, () {
       if (!mounted) {
         return;
