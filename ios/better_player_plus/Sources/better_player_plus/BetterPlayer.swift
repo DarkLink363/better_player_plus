@@ -35,10 +35,17 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
     private weak var previousPlayerView: UIView?
 
     public var pictureInPicture: Bool = false
+    /// Whether iOS may start PiP on its own when the app goes to the background.
+    /// Dart sets it from `BetterPlayerControlsConfiguration.enablePip`. Off until
+    /// then, so an app with PiP disabled never gets it, not even briefly.
+    private var allowsAutomaticPictureInPicture: Bool = false
     public var observersAdded: Bool = false
     private weak var observedItem: AVPlayerItem?
     public var stalledCount: Int = 0
     public var isStalledCheckStarted: Bool = false
+    /// Resume attempts with a full buffer in the current stall (separate from
+    /// `stalledCount`, which counts seconds of waiting for data).
+    private var resumeAttempts: Int = 0
     public var playerRate: Float = 1.0
     public var overriddenDuration: Int = 0
     public var preferredForwardBufferDuration: TimeInterval = 0
@@ -279,26 +286,56 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
         startStalledCheck()
     }
 
+    /// How many times playback is resumed while the buffer is full but AVPlayer
+    /// still stays stopped. After that it is treated as an external pause.
+    private static let maxResumeAttemptsWithFullBuffer = 3
+
     private func startStalledCheck() {
-        guard isPlaying else {
-            isStalledCheckStarted = false
+        guard isPlaying, let currentItem = player.currentItem else {
+            endStalledCheck()
             return
         }
-        if let currentItem = player.currentItem {
-            if currentItem.isPlaybackLikelyToKeepUp || (availableDuration() - CMTimeGetSeconds(currentItem.currentTime())) > 10.0 {
-                play()
-            } else {
-                stalledCount += 1
-                if stalledCount > 60 {
-                    if let eventSink = eventSink {
-                        let error = FlutterError(code: "VideoError", message: "Failed to load video: playback stalled", details: nil)
-                        eventSink(error)
-                    }
-                    return
-                }
-                perform(#selector(startStalledCheckObjC), with: nil, afterDelay: 1)
-            }
+        // Playback is running again: the stall is over.
+        if player.timeControlStatus == .playing {
+            endStalledCheck()
+            return
         }
+        if currentItem.isPlaybackLikelyToKeepUp || (availableDuration() - CMTimeGetSeconds(currentItem.currentTime())) > 10.0 {
+            // The buffer is full but AVPlayer is still stopped, e.g. after
+            // returning from PiP or an audio session interruption. Do not call
+            // `play()` here: it reset the stall state, AVPlayer set the rate back
+            // to 0 right away, and the `rate` observer and `play()` kept calling
+            // each other on the main thread, which froze the app. Retry with a
+            // delay and a limit instead.
+            resumeAttempts += 1
+            if resumeAttempts > Self.maxResumeAttemptsWithFullBuffer {
+                NSLog("[BetterPlayer] resume refused \(resumeAttempts - 1)x, reason=\(String(describing: player.reasonForWaitingToPlay?.rawValue)), status=\(player.timeControlStatus.rawValue); treating as pause")
+                endStalledCheck()
+                isPlaying = false
+                player.pause()
+                eventSink?(["event": "pause"])
+                return
+            }
+            applyPlayerRate()
+            perform(#selector(startStalledCheckObjC), with: nil, afterDelay: 1)
+        } else {
+            stalledCount += 1
+            if stalledCount > 60 {
+                if let eventSink = eventSink {
+                    let error = FlutterError(code: "VideoError", message: "Failed to load video: playback stalled", details: nil)
+                    eventSink(error)
+                }
+                return
+            }
+            perform(#selector(startStalledCheckObjC), with: nil, afterDelay: 1)
+        }
+    }
+
+    private func endStalledCheck() {
+        NSObject.cancelPreviousPerformRequests(withTarget: self, selector: #selector(startStalledCheckObjC), object: nil)
+        isStalledCheckStarted = false
+        stalledCount = 0
+        resumeAttempts = 0
     }
 
     @objc private func startStalledCheckObjC() { startStalledCheck() }
@@ -450,6 +487,7 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
 
     public func play() {
         stalledCount = 0
+        resumeAttempts = 0
         isStalledCheckStarted = false
         isPlaying = true
         armPictureInPicture()
@@ -460,6 +498,7 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
         NSObject.cancelPreviousPerformRequests(withTarget: self, selector: #selector(startStalledCheckObjC), object: nil)
         isStalledCheckStarted = false
         stalledCount = 0
+        resumeAttempts = 0
         isPlaying = false
         updatePlayingState()
     }
@@ -553,6 +592,17 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
         return ((onScreen ?? candidates.first)?.layer) as? AVPlayerLayer
     }
 
+    /// Allows or forbids iOS to start PiP automatically when the app goes to the
+    /// background (`canStartPictureInPictureAutomaticallyFromInline`).
+    public func setAllowsAutomaticPictureInPicture(_ allowed: Bool) {
+        allowsAutomaticPictureInPicture = allowed
+        if allowed {
+            if isPlaying { armPictureInPicture() }
+        } else if #available(iOS 14.2, *) {
+            pipController?.canStartPictureInPictureAutomaticallyFromInline = false
+        }
+    }
+
     /// Points the PiP controller at the on-screen layer and arms automatic PiP.
     ///
     /// Idempotent and cheap, so it is called from both `view()` and `play()`.
@@ -569,7 +619,10 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
     ///   `startPictureInPicture()` from `willResignActive`, so arming late — the
     ///   old code built the controller 0.2s after the button press — can never
     ///   produce background PiP.
-    private func armPictureInPicture() {
+    ///
+    /// `force`: PiP requested explicitly (the PiP button), regardless of automatic PiP.
+    private func armPictureInPicture(force: Bool = false) {
+        guard force || allowsAutomaticPictureInPicture else { return }
         guard AVPictureInPictureController.isPictureInPictureSupported(), let layer = displayLayer else { return }
         // Never swap the controller out from under a live PiP session — that would
         // orphan the window the viewer is watching.
@@ -579,7 +632,7 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
             pipController?.delegate = self
         }
         if #available(iOS 14.2, *) {
-            pipController?.canStartPictureInPictureAutomaticallyFromInline = true
+            pipController?.canStartPictureInPictureAutomaticallyFromInline = allowsAutomaticPictureInPicture
         }
     }
 
@@ -587,7 +640,7 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
         // `frame` is ignored: the layer is the Flutter platform view, so Flutter
         // already owns its geometry. The parameter stays for channel compatibility.
         try? AVAudioSession.sharedInstance().setActive(true)
-        armPictureInPicture()
+        armPictureInPicture(force: true)
         setPictureInPicture(true)
     }
 
