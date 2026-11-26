@@ -82,6 +82,7 @@ internal class BetterPlayer(
     private val eventChannel: EventChannel,
     private val surfaceProducer: SurfaceProducer,
     customDefaultLoadControl: CustomDefaultLoadControl?,
+    reinitializeDecoderOnResolutionChange: Boolean,
     result: MethodChannel.Result
 ) {
     private val exoPlayer: ExoPlayer?
@@ -114,8 +115,10 @@ internal class BetterPlayer(
             this.customDefaultLoadControl.bufferForPlaybackAfterRebufferMs
         )
         loadControl = loadBuilder.build()
-        val renderersFactory = DefaultRenderersFactory(context)
-            .setEnableDecoderFallback(true)
+        val renderersFactory = (
+                if (reinitializeDecoderOnResolutionChange) ResolutionSafeRenderersFactory(context)
+                else DefaultRenderersFactory(context)
+                ).setEnableDecoderFallback(true)
         exoPlayer = ExoPlayer.Builder(context)
             .setRenderersFactory(renderersFactory)
             .setTrackSelector(trackSelector)
