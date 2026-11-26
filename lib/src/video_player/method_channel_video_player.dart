@@ -32,6 +32,7 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
         'maxBufferMs': bufferingConfiguration.maxBufferMs,
         'bufferForPlaybackMs': bufferingConfiguration.bufferForPlaybackMs,
         'bufferForPlaybackAfterRebufferMs': bufferingConfiguration.bufferForPlaybackAfterRebufferMs,
+        'reinitializeDecoderOnResolutionChange': bufferingConfiguration.reinitializeDecoderOnResolutionChange,
       });
 
       response = responseLinkedHashMap != null ? Map<String, dynamic>.from(responseLinkedHashMap) : null;

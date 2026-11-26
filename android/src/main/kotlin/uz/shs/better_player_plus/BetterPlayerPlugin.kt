@@ -132,7 +132,9 @@ class BetterPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
                 }
                 val player = BetterPlayer(
                     flutterState?.applicationContext!!, eventChannel, handle,
-                    customDefaultLoadControl, result
+                    customDefaultLoadControl,
+                    call.argument<Boolean>(REINITIALIZE_DECODER_ON_RESOLUTION_CHANGE) ?: false,
+                    result
                 )
                 videoPlayers.put(handle.id(), player)
             }
@@ -598,6 +600,8 @@ class BetterPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
         private const val POSITION_METHOD = "position"
         private const val ABSOLUTE_POSITION_METHOD = "absolutePosition"
         private const val GET_DIAGNOSTICS_METHOD = "getDiagnostics"
+        private const val REINITIALIZE_DECODER_ON_RESOLUTION_CHANGE =
+            "reinitializeDecoderOnResolutionChange"
         private const val SET_SPEED_METHOD = "setSpeed"
         private const val SET_TRACK_PARAMETERS_METHOD = "setTrackParameters"
         private const val SET_AUDIO_TRACK_METHOD = "setAudioTrack"
