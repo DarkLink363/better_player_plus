@@ -146,6 +146,19 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
   );
 
   @override
+  Future<Map<String, dynamic>> getDiagnostics(int? textureId) async {
+    try {
+      final Map<String, dynamic>? diagnostics = await _channel.invokeMapMethod<String, dynamic>(
+        'getDiagnostics',
+        <String, dynamic>{'textureId': textureId},
+      );
+      return diagnostics ?? <String, dynamic>{};
+    } on MissingPluginException {
+      return <String, dynamic>{};
+    }
+  }
+
+  @override
   Future<DateTime?> getAbsolutePosition(int? textureId) async {
     final int milliseconds =
         await _channel.invokeMethod<int>('absolutePosition', <String, dynamic>{'textureId': textureId}) ?? 0;
@@ -285,6 +298,14 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
 
           case 'pipStop':
             return VideoEvent(eventType: VideoEventType.pipStop, key: key);
+
+          case 'diagnostic':
+            return VideoEvent(
+              eventType: VideoEventType.diagnostic,
+              key: key,
+              diagnosticType: map['type'] as String?,
+              diagnosticData: (map['data'] as Map?)?.cast<String, dynamic>(),
+            );
 
           default:
             return VideoEvent(eventType: VideoEventType.unknown, key: key);

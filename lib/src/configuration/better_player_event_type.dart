@@ -25,4 +25,8 @@ enum BetterPlayerEventType {
   bufferingUpdate,
   bufferingEnd,
   changedPlaylistItem,
+
+  /// The native player reported something about decoders, the surface or
+  /// loading. `parameters` hold `type` and `data`. Android only.
+  diagnostic,
 }

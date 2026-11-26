@@ -240,6 +240,11 @@ class BetterPlayerController {
         bufferingConfiguration: betterPlayerDataSource.bufferingConfiguration,
       );
       videoPlayerController?.addListener(_onVideoPlayerChanged);
+      // Listen from the start: the first source reports its decoder and first
+      // frame before it is initialized, which `_initializeVideo` is too late for.
+      _videoEventStreamSubscription = videoPlayerController?.videoEventStreamController.stream.listen(
+        _handleVideoEvent,
+      );
     }
 
     ///Clear asms tracks
@@ -621,6 +626,12 @@ class BetterPlayerController {
     _postEvent(BetterPlayerEvent(BetterPlayerEventType.pause));
   }
 
+  /// State of the native player, its decoders and its surface. Use it to tell
+  /// a slow network from a stuck decoder when a video takes long to start.
+  /// Android only; empty elsewhere and before a data source is set.
+  Future<Map<String, dynamic>> getDiagnostics() async =>
+      await videoPlayerController?.getDiagnostics() ?? <String, dynamic>{};
+
   ///Move player to specific position/moment of the video.
   Future<void> seekTo(Duration moment) async {
     if (videoPlayerController == null) {
@@ -742,7 +753,10 @@ class BetterPlayerController {
       _postEvent(
         BetterPlayerEvent(
           BetterPlayerEventType.exception,
-          parameters: <String, dynamic>{'exception': currentVideoPlayerValue.errorDescription},
+          parameters: <String, dynamic>{
+            'exception': currentVideoPlayerValue.errorDescription,
+            'details': videoPlayerController?.lastErrorDetails,
+          },
         ),
       );
     }
@@ -1125,6 +1139,13 @@ class BetterPlayerController {
         );
       case VideoEventType.bufferingEnd:
         _postEvent(BetterPlayerEvent(BetterPlayerEventType.bufferingEnd));
+      case VideoEventType.diagnostic:
+        _postEvent(
+          BetterPlayerEvent(
+            BetterPlayerEventType.diagnostic,
+            parameters: <String, dynamic>{'type': event.diagnosticType, 'data': event.diagnosticData},
+          ),
+        );
       default:
         break;
     }

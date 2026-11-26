@@ -86,6 +86,8 @@ internal class BetterPlayer(
 ) {
     private val exoPlayer: ExoPlayer?
     private val eventSink = QueuingEventSink()
+    private val playbackDiagnostics =
+        PlaybackDiagnostics(context, surfaceProducer) { event -> eventSink.success(event) }
     private val trackSelector: DefaultTrackSelector = DefaultTrackSelector(context)
     private val loadControl: LoadControl
     private var isInitialized = false
@@ -204,6 +206,7 @@ internal class BetterPlayer(
         } else {
             exoPlayer?.setMediaSource(mediaSource)
         }
+        playbackDiagnostics.onPrepare()
         exoPlayer?.prepare()
         result.success(null)
     }
@@ -473,6 +476,7 @@ internal class BetterPlayer(
         })
         exoPlayer?.setVideoSurface(surfaceProducer.surface)
         setAudioAttributes(exoPlayer, true)
+        exoPlayer?.addAnalyticsListener(playbackDiagnostics)
         exoPlayer?.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 when (playbackState) {
@@ -507,7 +511,11 @@ internal class BetterPlayer(
             }
 
             override fun onPlayerError(error: PlaybackException) {
-                eventSink.error("VideoError", "Video player had error $error", "")
+                eventSink.error(
+                    "VideoError",
+                    "Video player had error $error",
+                    playbackDiagnostics.errorDetails(error, exoPlayer)
+                )
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -523,6 +531,9 @@ internal class BetterPlayer(
         reply["textureId"] = surfaceProducer.id()
         result.success(reply)
     }
+
+    /** State of the player, decoders and surface; see [PlaybackDiagnostics.snapshot]. */
+    fun diagnostics(): Map<String, Any?> = playbackDiagnostics.snapshot(exoPlayer)
 
     fun sendBufferingUpdate(isFromBufferingStart: Boolean) {
         val bufferedPosition = exoPlayer?.bufferedPosition ?: 0L

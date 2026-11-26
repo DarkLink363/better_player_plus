@@ -188,6 +188,10 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   final BetterPlayerBufferingConfiguration bufferingConfiguration;
 
   final StreamController<VideoEvent> videoEventStreamController = StreamController.broadcast();
+
+  /// What the platform attached to the last playback error (error code,
+  /// decoder, causes), or null. Cleared when a new data source is set.
+  Map<String, dynamic>? lastErrorDetails;
   final Completer<void> _creatingCompleter = Completer<void>();
   int? _textureId;
 
@@ -250,6 +254,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
           value = value.copyWith(isPip: true);
         case VideoEventType.pipStop:
           value = value.copyWith(isPip: false);
+        case VideoEventType.diagnostic:
         case VideoEventType.unknown:
           break;
       }
@@ -258,6 +263,8 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     void errorListener(Object object) {
       if (object is PlatformException) {
         final PlatformException e = object;
+        final Object? details = e.details;
+        lastErrorDetails = details is Map ? details.cast<String, dynamic>() : null;
         value = value.copyWith(errorDescription: e.message);
       } else {
         value.copyWith(errorDescription: object.toString());
@@ -391,6 +398,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     // A pending seek belongs to the previous source. Left set, `_updatePosition` keeps reporting
     // it until playback passes it, so a shorter next video appears stuck at (or past) its end.
     _seekPosition = null;
+    lastErrorDetails = null;
     value = VideoPlayerValue(duration: null, isLooping: value.isLooping, volume: value.volume);
 
     if (!_creatingCompleter.isCompleted) {
@@ -513,6 +521,16 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
       return;
     }
     await _videoPlayerPlatform.setSpeed(_textureId, value.speed);
+  }
+
+  /// State of the player, its decoders and its surface, for telling a slow
+  /// network from a stuck decoder. Empty on platforms that do not report it,
+  /// and before the player is created or after it is disposed.
+  Future<Map<String, dynamic>> getDiagnostics() async {
+    if (!_created || _isDisposed) {
+      return <String, dynamic>{};
+    }
+    return _videoPlayerPlatform.getDiagnostics(_textureId);
   }
 
   /// The position in the current video.
