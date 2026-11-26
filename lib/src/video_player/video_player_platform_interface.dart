@@ -133,6 +133,12 @@ abstract class VideoPlayerPlatform {
     throw UnimplementedError('getPosition() has not been implemented.');
   }
 
+  /// State of the player, its decoders and its surface. Empty on platforms
+  /// that do not report it.
+  Future<Map<String, dynamic>> getDiagnostics(int? textureId) {
+    throw UnimplementedError('getDiagnostics() has not been implemented.');
+  }
+
   /// Gets the video position as [DateTime].
   Future<DateTime?> getAbsolutePosition(int? textureId) {
     throw UnimplementedError('getAbsolutePosition() has not been implemented.');
@@ -383,6 +389,8 @@ class VideoEvent {
     this.buffered,
     this.position,
     this.rotationCorrection = 0,
+    this.diagnosticType,
+    this.diagnosticData,
   });
 
   /// The type of the event.
@@ -415,6 +423,16 @@ class VideoEvent {
   ///
   /// Only used if [eventType] is [VideoEventType.initialized].
   final int rotationCorrection;
+
+  /// What the player reported, for example `videoDecoderInitialized`.
+  ///
+  /// Only used if [eventType] is [VideoEventType.diagnostic].
+  final String? diagnosticType;
+
+  /// Details of the report.
+  ///
+  /// Only used if [eventType] is [VideoEventType.diagnostic].
+  final Map<String, dynamic>? diagnosticData;
 
   @override
   bool operator ==(Object other) =>
@@ -467,6 +485,10 @@ enum VideoEventType {
 
   /// Picture in picture mode has been dismissed
   pipStop,
+
+  /// The player reported something about decoders, the surface or loading.
+  /// Android only.
+  diagnostic,
 
   /// An unknown event has been received.
   unknown,
